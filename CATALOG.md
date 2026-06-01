@@ -1,0 +1,22 @@
+---
+title: PowerShell
+description: Cross-platform automation shell and scripting language for every system
+keywords: powershell,pwsh,shell,scripting,automation,microsoft,cross-platform
+---
+
+# PowerShell
+
+PowerShell is a cross-platform automation and configuration tool from Microsoft,
+built on .NET. It is both an interactive command shell and a scripting language,
+working with structured objects rather than plain text so command output can be
+piped, filtered, and composed programmatically. The `pwsh` executable runs the
+same scripts and modules on Linux, macOS, and Windows.
+
+## What's included
+
+- **pwsh** — the PowerShell command shell and script host (`-Command`, `-File`, `-NoLogo`, interactive REPL, modules)
+
+## Links
+
+- [PowerShell Documentation](https://learn.microsoft.com/powershell/)
+- [PowerShell on GitHub](https://github.com/PowerShell/PowerShell)

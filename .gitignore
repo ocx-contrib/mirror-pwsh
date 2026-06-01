@@ -1,0 +1,16 @@
+# Local prepare scratch
+.ocx-mirror/
+prepare-output/
+
+# Local artifacts
+*.tar.xz
+*.tar.gz
+run-summary.json
+junit/
+
+# Editor
+.vscode/
+.idea/
+
+# Serena
+.serena/
