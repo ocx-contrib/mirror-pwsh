@@ -25,10 +25,17 @@ assets:
   #   - "^powershell-.*-osx-x64\\.tar\\.gz$"
   # darwin/arm64:
   #   - "^powershell-.*-osx-arm64\\.tar\\.gz$"
+  # .zip only — exclude the win-x86 / win-fxdependent zips, the .msi installers,
+  # and the .msixbundle Store package. The PowerShell-<v>-win-<arch>.zip is a
+  # self-contained payload (pwsh.exe + sibling DLLs) flat at the archive root.
+  windows/amd64:
+    - "^PowerShell-.*-win-x64\\.zip$"
+  windows/arm64:
+    - "^PowerShell-.*-win-arm64\\.zip$"
 
 asset_type:
   type: archive
-  strip_components: 0   # tarball extracts pwsh + *.dll/*.so FLAT at the archive root
+  strip_components: 0   # tarball/zip extracts pwsh(.exe) + *.dll/*.so FLAT at the archive root
 
 metadata:
   default: metadata.json
@@ -66,6 +73,12 @@ platforms:
   # darwin/arm64:
   #   runner: macos-latest
   #   shell: bash
+  windows/amd64:
+    runner: windows-latest
+    shell: pwsh
+  windows/arm64:
+    runner: windows-11-arm
+    shell: pwsh
 
 notify:
   discord:
