@@ -21,10 +21,10 @@ assets:
   # linux/arm64 is not mirrored — see the skipped-platforms note in the bootstrap commit.
   linux/amd64:
     - "^powershell-.*-linux-x64\\.tar\\.gz$"
-  # darwin/amd64:
-  #   - "^powershell-.*-osx-x64\\.tar\\.gz$"
-  # darwin/arm64:
-  #   - "^powershell-.*-osx-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^powershell-.*-osx-x64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^powershell-.*-osx-arm64\\.tar\\.gz$"
   # .zip only — exclude the win-x86 / win-fxdependent zips, the .msi installers,
   # and the .msixbundle Store package. The PowerShell-<v>-win-<arch>.zip is a
   # self-contained payload (pwsh.exe + sibling DLLs) flat at the archive root.
@@ -67,12 +67,10 @@ tests:
 platforms:
   linux/amd64:
     runner: ubuntu-latest
-  # darwin/amd64:
-  #   runner: macos-latest
-  #   prefix: ["arch", "-x86_64"]
-  # darwin/arm64:
-  #   runner: macos-latest
-  #   shell: bash
+  darwin/amd64:
+    runner: macos-14
+  darwin/arm64:
+    runner: macos-14
   windows/amd64:
     runner: windows-latest
     shell: pwsh
