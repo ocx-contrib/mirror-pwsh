@@ -9,8 +9,5 @@
       "value": "${installPath}",
       "visibility": "public"
     }
-  ],
-  "entrypoints": {
-    "pwsh": {}
-  }
+  ]
 }
