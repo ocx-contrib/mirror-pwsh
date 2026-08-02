@@ -15,6 +15,10 @@ same scripts and modules on Linux, macOS, and Windows.
 ## What's included
 
 - **pwsh** — the PowerShell command shell and script host (`-Command`, `-File`, `-NoLogo`, interactive REPL, modules)
+- **createdump** — the .NET crash-dump helper shipped alongside `pwsh`; it lands on `PATH` with it, so it is declared rather than hidden
+
+Linux builds require `libicu` on the host (and, on musl, `libstdc++`) — the
+same prerequisite Microsoft's own install instructions name.
 
 ## Links
 
