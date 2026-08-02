@@ -1,0 +1,142 @@
+# Shared base for every spec in this repository (PowerShell).
+#
+# NOT a spec: it has no name/target/source and is never loaded on its own.
+# Everything a package owns — name, target, source, assets, asset_type,
+# metadata, catalog, tests, versions, announce, annotations — stays in that
+# package's own mirror.yml.
+#
+# ⚠️ `extends:` is a SHALLOW merge of top-level keys. A spec that sets a key
+# below replaces that block OUTRIGHT — there is no per-key merge. `platforms:`
+# is where this bites: it carries BOTH the runner matrix and the container
+# legs, so a child that restates it to tweak one runner silently drops every
+# `containers:` entry. Nothing reds — the legs simply stop existing, and every
+# os.features claim in that spec goes back to being merely asserted. Restate
+# `platforms:` IN FULL or not at all.
+
+skip_prereleases: true
+cascade: true
+
+# `none`, carried unchanged from this repository's flat layout. (The current
+# fleet default is `date`; switching is a separate, deliberate decision — see
+# README. Upstream never re-releases a `v7.x.y` tag, so the bare version tag is
+# written once either way and only the rolling cascade aliases move.)
+build_timestamp: none
+
+verify:
+  github_asset_digest: true
+
+concurrency:
+  # Assets are 70–110 MB self-contained .NET payloads (~730 files each) and
+  # every bundle re-compresses the whole tree — an order of magnitude more
+  # work per platform than a single-binary CLI mirror.
+  max_downloads: 8
+  max_bundles: 4
+  max_pushes: 2
+  rate_limit_ms: 100
+  max_retries: 3
+  compression_threads: 0
+
+# `off`, and it cannot be otherwise here. Every upstream archive extracts FLAT
+# at its root — `pwsh` sits beside ~725 sibling `*.dll`/`*.so` files with no
+# `bin/` directory anywhere — so the bundle's only PATH entry is a bare
+# `${installPath}`. The scan only looks BELOW an interface PATH entry of the
+# form `${installPath}/<dir>`, so `auto`/`verify` is rejected at spec load with
+# exit 65 ("bin_scan is enabled but … declares no interface-visible
+# ${installPath}/<dir> PATH entry"). `off` plus a hand-listed `binaries` in
+# metadata.json is the blessed shape for this layout.
+
+bin_scan: off
+
+# ─── Platform matrix ────────────────────────────────────────────────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST — it is not a
+# label for how it was built. Upstream ships a glibc build per Linux arch and a
+# SEPARATE musl build for amd64 only; the per-package measurement is recorded
+# above each spec's `assets:` block. NEITHER is static — each names its own
+# loader in PT_INTERP — so neither covers the other and both Linux flavours
+# carry an explicit libc feature. There is no arm64 musl asset, so there is no
+# `linux/arm64+libc.musl` key: declaring one would resolve zero assets and be
+# SILENTLY skipped.
+#
+# ⚠️ Container images here are Microsoft's `dotnet/runtime-deps`, NOT the
+# fleet-usual bare `ubuntu:24.04` / `fedora:40` / `alpine:3.20`. That is
+# forced, and it is not a libc question:
+#
+#   pwsh is a self-contained .NET app. Beyond its loader it needs libicu at
+#   process start, and on musl also libstdc++/libgcc_s. Measured 2026-08-02 on
+#   the real 7.6.4 payloads:
+#
+#     ubuntu:24.04, fedora:40, debian:12, rockylinux:9,
+#     almalinux:9, opensuse/leap:15.6 (glibc build)
+#         → "Couldn't find a valid ICU package installed on the system"
+#     alpine:3.20 (musl build)
+#         → "Error loading shared library libstdc++.so.6"
+#     alpine:3.20 + `apk add libstdc++`
+#         → still the ICU failure above
+#     alpine:3.20 + `apk add libstdc++ icu-libs`   → 4   ✅
+#     mcr.microsoft.com/dotnet/runtime-deps:9.0             (Debian 12)  → 4 ✅
+#     mcr.microsoft.com/dotnet/runtime-deps:9.0-noble       (Ubuntu 24)  → 4 ✅
+#     mcr.microsoft.com/dotnet/runtime-deps:9.0-alpine3.21  (musl)       → 4 ✅
+#
+#   `containers[]` takes only `image` and `shell` — there is NO setup/install
+#   hook, so `apk add libstdc++ icu-libs` cannot be expressed. An image that
+#   already carries those deps is the only way to have container legs at all;
+#   the alternative is dropping them and letting every libc claim go back to
+#   being merely asserted (and the musl key has no native fallback — a musl
+#   payload cannot run on the glibc runner, so its leg MUST be a container).
+#   `runtime-deps` is exactly "the minimal host a self-contained .NET app
+#   needs", which is the honest description of what pwsh requires.
+#
+# Container legs follow from what each key CLAIMS:
+#   - `+libc.glibc` → the Debian- and Ubuntu-based runtime-deps images, two
+#     glibc vintages (2.36 / 2.39). No musl image: the glibc build cannot load
+#     under musl, so an Alpine leg would red on a correct artifact.
+#   - `+libc.musl`  → the alpine-based runtime-deps image only. Same reasoning
+#     mirrored.
+# NOTE (2026-08-02): the `+libc.musl` platforms are DELIBERATELY NOT PUBLISHED.
+# PowerShell's musl builds are dynamically linked and additionally need
+# libstdc++.so.6 (and libgcc_s.so.1), which bare Alpine does not ship. The
+# container spec has no setup hook — `containers[]` accepts only `image` and
+# `shell` — and the renderer infers libc purely from the image basename
+# (`infer_libc_from_image` treats only `alpine*` as musl), so a libstdc++-bearing
+# image is rejected as glibc while bare `alpine:3.20` cannot load the artifact.
+# The container matrix exists so a libc claim is PROVEN, not asserted; with no
+# provable leg the honest outcome is to publish glibc only. Add the musl keys
+# once ocx-mirror gains `containers[].libc` (its own source comment anticipates
+# exactly that) or a package-install hook.
+platforms:
+  "linux/amd64+libc.glibc":
+    runner: ubuntu-latest
+    containers:
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
+  "linux/arm64+libc.glibc":
+    # arm64 container legs run natively — no qemu — so the runner arch must
+    # match the platform or the renderer's guard reds the leg up front. Both
+    # images publish linux/arm64.
+    runner: ubuntu-24.04-arm
+    containers:
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
+  darwin/amd64:
+    # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 — GitHub's
+    # native macos-13 Intel pool is exhausted and deadlocks the push job.
+    runner: macos-14
+    prefix: ["arch", "-x86_64"]
+  darwin/arm64:
+    runner: macos-14
+    shell: bash
+  windows/amd64:
+    runner: windows-latest
+    shell: pwsh
+  windows/arm64:
+    # Native arm64 Windows runner — the amd64 pool cannot execute an ARM64 PE.
+    runner: windows-11-arm
+    shell: pwsh
+  # No `containers:` on darwin or windows — those runners have no Linux
+  # container engine, and the key is rejected at spec load.
+
+notify:
+  discord:
+    webhook_secret: OCX_MIRROR_DISCORD_HOOK
+    user_id: "227748867204972545"  # pinged in-message on failures

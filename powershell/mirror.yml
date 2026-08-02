@@ -1,0 +1,136 @@
+extends: ../mirror-base.yml
+
+name: powershell
+
+# Logical index package `powershell/powershell` at the physical path
+# `ghcr.io/ocx-contrib/powershell/powershell` — slash segments, never
+# hyphen-flattened. The first segment must be this repo's own GitHub owner:
+# GITHUB_TOKEN only authorises packages owned by the repo the workflow runs in.
+#
+# The package segment is the name the PROJECT publishes under, not the binary
+# you type: upstream is `PowerShell/PowerShell` and ships `pwsh`, the same
+# relationship as `github/cli` shipping `gh`.
+#
+# Succeeds the flat `ocx.sh/pwsh` coordinate this repository published before
+# the grouped layout.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/powershell/powershell
+
+source:
+  type: github_release
+  owner: PowerShell
+  repo: PowerShell
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# pwsh is a self-contained .NET app, so nothing here is static. Measured on the
+# `pwsh` extracted from the real 7.6.4 tarballs:
+#
+#   -linux-x64.tar.gz        ELF x86-64 pie, dynamically linked,
+#                            interpreter /lib64/ld-linux-x86-64.so.2
+#                            NEEDED libdl libpthread libstdc++.so.6 libm
+#                                   libgcc_s.so.1 libc.so.6
+#   -linux-arm64.tar.gz      interpreter /lib/ld-linux-aarch64.so.1,
+#                            same NEEDED set
+#   -linux-musl-x64.tar.gz   interpreter /lib/ld-musl-x86_64.so.1
+#                            NEEDED libstdc++.so.6 libgcc_s.so.1
+#                                   libc.musl-x86_64.so.1
+#
+# Each names its own loader in PT_INTERP, so neither flavour covers the other
+# and both Linux flavours carry an explicit libc feature. `libstdc++.so.6` and
+# `libgcc_s.so.1` are NOT bundled in the archive — verified by listing all 727
+# members of the musl tarball — which, together with .NET's libicu requirement,
+# is why ../mirror-base.yml's container legs are the `dotnet/runtime-deps`
+# images rather than bare distro bases. The rationale is recorded there.
+#
+# ⚠️ musl is amd64-ONLY. Upstream publishes no `-linux-musl-arm64` asset, so
+# there is deliberately no `linux/arm64+libc.musl` key: a key matching zero
+# assets is SILENTLY skipped, not an error, and would look green forever.
+#
+# ─── Scope (verified against v7.6.0, the first in-range release, and v7.6.4)
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   *-linux-arm32.tar.gz                       — no GHA runner
+#   *-fxdependent*.tar.gz / .zip               — needs a preinstalled .NET SDK
+#   *-linux-x64-musl-noopt-fxdependent.tar.gz  — both of the above
+#   *.deb / *.rpm / *.pkg / *.msi / *.msixbundle — OS installers, not payloads
+#   PowerShell-*-win-x86.zip                   — no 32-bit GHA runner
+#   powershell-lts-*                           — the LTS channel republishes
+#                                                the same version under a
+#                                                second name (installers only)
+#   *.sha256                                   — sidecars
+#
+# The anchored ^…$ regexes are what keep those out: `-linux-x64\.tar\.gz$` does
+# not match `-linux-x64-fxdependent.tar.gz`, `-linux-musl-x64\.tar\.gz$` does
+# not match `-linux-x64-musl-noopt-fxdependent.tar.gz`, and
+# `-linux-arm64\.tar\.gz$` does not match `-linux-arm32.tar.gz`. Resolution
+# verified BOTH ways across EVERY in-range release (v7.6.0, .1, .2, .3, .4):
+# each of the seven patterns matches EXACTLY one asset, 35/35. A pattern
+# matching zero is silently skipped, not an error — it would yield a green run
+# with a missing platform.
+# NOTE (2026-08-02): the `+libc.musl` platforms are DELIBERATELY NOT PUBLISHED.
+# PowerShell's musl builds are dynamically linked and additionally need
+# libstdc++.so.6 (and libgcc_s.so.1), which bare Alpine does not ship. The
+# container spec has no setup hook — `containers[]` accepts only `image` and
+# `shell` — and the renderer infers libc purely from the image basename
+# (`infer_libc_from_image` treats only `alpine*` as musl), so a libstdc++-bearing
+# image is rejected as glibc while bare `alpine:3.20` cannot load the artifact.
+# The container matrix exists so a libc claim is PROVEN, not asserted; with no
+# provable leg the honest outcome is to publish glibc only. Add the musl keys
+# once ocx-mirror gains `containers[].libc` (its own source comment anticipates
+# exactly that) or a package-install hook.
+assets:
+  "linux/amd64+libc.glibc":
+    - "^powershell-.*-linux-x64\\.tar\\.gz$"
+  "linux/arm64+libc.glibc":
+    - "^powershell-.*-linux-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^powershell-.*-osx-x64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^powershell-.*-osx-arm64\\.tar\\.gz$"
+  windows/amd64:
+    - "^PowerShell-.*-win-x64\\.zip$"
+  windows/arm64:
+    - "^PowerShell-.*-win-arm64\\.zip$"
+
+asset_type:
+  type: archive
+  # Every tarball and zip extracts FLAT at the archive root — `pwsh`(.exe),
+  # `createdump`(.exe) and ~725 sibling `*.dll`/`*.so` files, no wrapper
+  # directory and no `bin/`. Stripping anything would eat the payload.
+  strip_components: 0
+
+metadata:
+  default: metadata.json
+
+catalog:
+  # Resolves against this spec's own directory, and keeping the logo here puts
+  # it inside this workflow's `powershell/**` path trigger — a repo-root logo.*
+  # sits in no path filter and replacing it would publish nothing.
+  # CATALOG.md is found by the default probe beside this file.
+  logo: logo.svg
+
+versions:
+  min: "7.6.0"
+  new_per_run: 5
+  poll_interval: "0 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: powershell/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/PowerShell/PowerShell/license --jq '.license.spdx_id'
+  #   MIT
+  org.opencontainers.image.licenses: "MIT"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: powershell/powershell
+  fork: ocx-contrib/index
