@@ -39,19 +39,23 @@ source:
 #                                   libc.musl-x86_64.so.1
 #
 # Each names its own loader in PT_INTERP, so neither flavour covers the other
-# and both Linux flavours carry an explicit libc feature. `libstdc++.so.6` and
-# `libgcc_s.so.1` are NOT bundled in the archive — verified by listing all 727
-# members of the musl tarball — which, together with .NET's libicu requirement,
-# is why ../mirror-base.yml's container legs are the `dotnet/runtime-deps`
-# images rather than bare distro bases. The rationale is recorded there.
+# and the mirrored Linux keys carry an explicit libc feature rather than a
+# bare, universality-claiming key. `libstdc++.so.6` and `libgcc_s.so.1` are NOT
+# bundled in the archive — verified by listing all 727 members of the musl
+# tarball — which, together with .NET's libicu requirement, is why
+# ../mirror-base.yml's container legs are the `dotnet/runtime-deps` images
+# rather than bare distro bases. The rationale is recorded there.
 #
-# ⚠️ musl is amd64-ONLY. Upstream publishes no `-linux-musl-arm64` asset, so
-# there is deliberately no `linux/arm64+libc.musl` key: a key matching zero
-# assets is SILENTLY skipped, not an error, and would look green forever.
+# ⚠️ `powershell-<v>-linux-musl-x64.tar.gz` exists upstream (amd64 only; there
+# is no musl arm64 build) and is deliberately NOT mirrored. Its container leg
+# cannot be expressed today — the full reasoning is in ../mirror-base.yml above
+# `platforms:`. This is the one gap between what upstream ships and what this
+# spec carries that is NOT a "no runner"/"needs an SDK" exclusion.
 #
 # ─── Scope (verified against v7.6.0, the first in-range release, and v7.6.4)
 #
 # Upstream also publishes, and this mirror deliberately does not carry:
+#   *-linux-musl-x64.tar.gz                    — see the musl note above
 #   *-linux-arm32.tar.gz                       — no GHA runner
 #   *-fxdependent*.tar.gz / .zip               — needs a preinstalled .NET SDK
 #   *-linux-x64-musl-noopt-fxdependent.tar.gz  — both of the above
@@ -63,13 +67,12 @@ source:
 #   *.sha256                                   — sidecars
 #
 # The anchored ^…$ regexes are what keep those out: `-linux-x64\.tar\.gz$` does
-# not match `-linux-x64-fxdependent.tar.gz`, `-linux-musl-x64\.tar\.gz$` does
-# not match `-linux-x64-musl-noopt-fxdependent.tar.gz`, and
+# not match `-linux-x64-fxdependent.tar.gz` or `-linux-musl-x64.tar.gz`, and
 # `-linux-arm64\.tar\.gz$` does not match `-linux-arm32.tar.gz`. Resolution
 # verified BOTH ways across EVERY in-range release (v7.6.0, .1, .2, .3, .4):
-# each of the seven patterns matches EXACTLY one asset, 35/35. A pattern
-# matching zero is silently skipped, not an error — it would yield a green run
-# with a missing platform.
+# each of the six patterns matches EXACTLY one asset, 30/30. A pattern matching
+# zero is silently skipped, not an error — it would yield a green run with a
+# missing platform.
 # NOTE (2026-08-02): the `+libc.musl` platforms are DELIBERATELY NOT PUBLISHED.
 # PowerShell's musl builds are dynamically linked and additionally need
 # libstdc++.so.6 (and libgcc_s.so.1), which bare Alpine does not ship. The

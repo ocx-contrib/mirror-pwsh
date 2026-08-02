@@ -50,17 +50,16 @@ bin_scan: off
 # ─── Platform matrix ────────────────────────────────────────────────────────
 #
 # `os.features` states what an artifact REQUIRES OF THE HOST — it is not a
-# label for how it was built. Upstream ships a glibc build per Linux arch and a
-# SEPARATE musl build for amd64 only; the per-package measurement is recorded
-# above each spec's `assets:` block. NEITHER is static — each names its own
-# loader in PT_INTERP — so neither covers the other and both Linux flavours
-# carry an explicit libc feature. There is no arm64 musl asset, so there is no
-# `linux/arm64+libc.musl` key: declaring one would resolve zero assets and be
-# SILENTLY skipped.
+# label for how it was built. Upstream ships a glibc build per Linux arch (and
+# a musl build for amd64 only, deliberately not mirrored — see below). The
+# per-package measurement is recorded above each spec's `assets:` block:
+# nothing here is static, each build names its own loader in PT_INTERP, so
+# neither flavour covers the other and the Linux keys carry an explicit libc
+# feature rather than a bare, universality-claiming key.
 #
 # ⚠️ Container images here are Microsoft's `dotnet/runtime-deps`, NOT the
-# fleet-usual bare `ubuntu:24.04` / `fedora:40` / `alpine:3.20`. That is
-# forced, and it is not a libc question:
+# fleet-usual bare `ubuntu:24.04` / `fedora:40`. That is forced, and it is not
+# a libc question:
 #
 #   pwsh is a self-contained .NET app. Beyond its loader it needs libicu at
 #   process start, and on musl also libstdc++/libgcc_s. Measured 2026-08-02 on
@@ -71,39 +70,33 @@ bin_scan: off
 #         → "Couldn't find a valid ICU package installed on the system"
 #     alpine:3.20 (musl build)
 #         → "Error loading shared library libstdc++.so.6"
-#     alpine:3.20 + `apk add libstdc++`
-#         → still the ICU failure above
+#     alpine:3.20 + `apk add libstdc++`            → still the ICU failure
 #     alpine:3.20 + `apk add libstdc++ icu-libs`   → 4   ✅
 #     mcr.microsoft.com/dotnet/runtime-deps:9.0             (Debian 12)  → 4 ✅
 #     mcr.microsoft.com/dotnet/runtime-deps:9.0-noble       (Ubuntu 24)  → 4 ✅
 #     mcr.microsoft.com/dotnet/runtime-deps:9.0-alpine3.21  (musl)       → 4 ✅
 #
 #   `containers[]` takes only `image` and `shell` — there is NO setup/install
-#   hook, so `apk add libstdc++ icu-libs` cannot be expressed. An image that
-#   already carries those deps is the only way to have container legs at all;
-#   the alternative is dropping them and letting every libc claim go back to
-#   being merely asserted (and the musl key has no native fallback — a musl
-#   payload cannot run on the glibc runner, so its leg MUST be a container).
-#   `runtime-deps` is exactly "the minimal host a self-contained .NET app
-#   needs", which is the honest description of what pwsh requires.
+#   hook, so `apt-get install libicu` / `apk add libstdc++ icu-libs` cannot be
+#   expressed. An image that already carries those deps is the only way to have
+#   container legs at all, and `runtime-deps` is exactly "the minimal host a
+#   self-contained .NET app needs" — the honest description of what pwsh
+#   requires. Without them every libc claim goes back to being merely asserted.
 #
-# Container legs follow from what each key CLAIMS:
-#   - `+libc.glibc` → the Debian- and Ubuntu-based runtime-deps images, two
-#     glibc vintages (2.36 / 2.39). No musl image: the glibc build cannot load
-#     under musl, so an Alpine leg would red on a correct artifact.
-#   - `+libc.musl`  → the alpine-based runtime-deps image only. Same reasoning
-#     mirrored.
-# NOTE (2026-08-02): the `+libc.musl` platforms are DELIBERATELY NOT PUBLISHED.
-# PowerShell's musl builds are dynamically linked and additionally need
-# libstdc++.so.6 (and libgcc_s.so.1), which bare Alpine does not ship. The
-# container spec has no setup hook — `containers[]` accepts only `image` and
-# `shell` — and the renderer infers libc purely from the image basename
-# (`infer_libc_from_image` treats only `alpine*` as musl), so a libstdc++-bearing
-# image is rejected as glibc while bare `alpine:3.20` cannot load the artifact.
-# The container matrix exists so a libc claim is PROVEN, not asserted; with no
-# provable leg the honest outcome is to publish glibc only. Add the musl keys
-# once ocx-mirror gains `containers[].libc` (its own source comment anticipates
-# exactly that) or a package-install hook.
+# ⚠️ NO `+libc.musl` KEY, and that is a limitation rather than a preference.
+# The musl payload cannot run natively on the glibc runner, so its leg MUST be
+# a container — and the renderer infers a container's libc purely from the
+# image BASENAME (`infer_libc_from_image`: only `alpine*` is musl). So the one
+# musl image that actually works, `…/runtime-deps:9.0-alpine3.21`, is read as
+# glibc and rejected at spec load, while the accepted `alpine:3.20` cannot load
+# the artifact. With no provable leg the honest outcome is glibc only. Restore
+# the key once ocx-mirror grows `containers[].libc` (its own source comment
+# anticipates exactly that) or a per-container setup hook.
+#
+# Container legs follow from what the keys CLAIM: `+libc.glibc` → the Debian-
+# and Ubuntu-based runtime-deps images, two glibc vintages (2.36 / 2.39), and
+# no musl image, since the glibc build cannot load under musl and an Alpine leg
+# would red on a correct artifact.
 platforms:
   "linux/amd64+libc.glibc":
     runner: ubuntu-latest
