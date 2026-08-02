@@ -101,30 +101,38 @@ platforms:
   "linux/amd64+libc.glibc":
     runner: ubuntu-latest
     containers:
-      # Fleet-standard images. The MS `dotnet/runtime-deps` images were tried
-      # first (to guarantee the .NET native deps) and every leg died with
-      # `failed to spawn 'pwsh': Permission denied (os error 13)` — the exec bit
-      # is present in the upstream tarball (`-rwxr-xr-x pwsh`, verified), so the
-      # loss is specific to those images, not to the artifact. PowerShell ships
-      # a self-contained runtime and needs only OS-level libs that these images
-      # already carry.
-      - { image: "ubuntu:24.04", shell: bash }
-      - { image: "fedora:40",    shell: bash }
+      # PowerShell REQUIRES ICU. Measured, not assumed: with the bundle mounted
+      # into `ubuntu:24.04`, `pwsh` executes (so the exec bit is intact) and then
+      # aborts inside `System.Globalization.CultureInfo..cctor()` — the classic
+      # missing-libicu crash. In `mcr.microsoft.com/dotnet/runtime-deps:9.0` the
+      # same bundle runs `1+1` → `2`. So the fleet-standard ubuntu/fedora legs
+      # are WRONG for this package and these MS images are right: they carry the
+      # .NET native prerequisites PowerShell documents.
+      #
+      # `os.features` can express only a libc family, never "needs libicu", and
+      # `containers[]` has no package-install hook — so the image is the only
+      # place this requirement can be satisfied.
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
   "linux/arm64+libc.glibc":
     # arm64 container legs run natively — no qemu — so the runner arch must
     # match the platform or the renderer's guard reds the leg up front. Both
     # images publish linux/arm64.
     runner: ubuntu-24.04-arm
     containers:
-      # Fleet-standard images. The MS `dotnet/runtime-deps` images were tried
-      # first (to guarantee the .NET native deps) and every leg died with
-      # `failed to spawn 'pwsh': Permission denied (os error 13)` — the exec bit
-      # is present in the upstream tarball (`-rwxr-xr-x pwsh`, verified), so the
-      # loss is specific to those images, not to the artifact. PowerShell ships
-      # a self-contained runtime and needs only OS-level libs that these images
-      # already carry.
-      - { image: "ubuntu:24.04", shell: bash }
-      - { image: "fedora:40",    shell: bash }
+      # PowerShell REQUIRES ICU. Measured, not assumed: with the bundle mounted
+      # into `ubuntu:24.04`, `pwsh` executes (so the exec bit is intact) and then
+      # aborts inside `System.Globalization.CultureInfo..cctor()` — the classic
+      # missing-libicu crash. In `mcr.microsoft.com/dotnet/runtime-deps:9.0` the
+      # same bundle runs `1+1` → `2`. So the fleet-standard ubuntu/fedora legs
+      # are WRONG for this package and these MS images are right: they carry the
+      # .NET native prerequisites PowerShell documents.
+      #
+      # `os.features` can express only a libc family, never "needs libicu", and
+      # `containers[]` has no package-install hook — so the image is the only
+      # place this requirement can be satisfied.
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
+      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
   darwin/amd64:
     # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 — GitHub's
     # native macos-13 Intel pool is exhausted and deadlocks the push job.
