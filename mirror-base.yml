@@ -101,16 +101,30 @@ platforms:
   "linux/amd64+libc.glibc":
     runner: ubuntu-latest
     containers:
-      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
-      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
+      # Fleet-standard images. The MS `dotnet/runtime-deps` images were tried
+      # first (to guarantee the .NET native deps) and every leg died with
+      # `failed to spawn 'pwsh': Permission denied (os error 13)` — the exec bit
+      # is present in the upstream tarball (`-rwxr-xr-x pwsh`, verified), so the
+      # loss is specific to those images, not to the artifact. PowerShell ships
+      # a self-contained runtime and needs only OS-level libs that these images
+      # already carry.
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "fedora:40",    shell: bash }
   "linux/arm64+libc.glibc":
     # arm64 container legs run natively — no qemu — so the runner arch must
     # match the platform or the renderer's guard reds the leg up front. Both
     # images publish linux/arm64.
     runner: ubuntu-24.04-arm
     containers:
-      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0",       shell: bash }
-      - { image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble", shell: bash }
+      # Fleet-standard images. The MS `dotnet/runtime-deps` images were tried
+      # first (to guarantee the .NET native deps) and every leg died with
+      # `failed to spawn 'pwsh': Permission denied (os error 13)` — the exec bit
+      # is present in the upstream tarball (`-rwxr-xr-x pwsh`, verified), so the
+      # loss is specific to those images, not to the artifact. PowerShell ships
+      # a self-contained runtime and needs only OS-level libs that these images
+      # already carry.
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "fedora:40",    shell: bash }
   darwin/amd64:
     # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 — GitHub's
     # native macos-13 Intel pool is exhausted and deadlocks the push job.

@@ -154,8 +154,8 @@ jobs:
           - platform: linux/amd64+libc.glibc
             platform_slug: linux_amd64_libc.glibc
             runner: ubuntu-latest
-            container_id: mcr_microsoft_com_dotnet_runtime-deps_9_0
-            container_image: "mcr.microsoft.com/dotnet/runtime-deps:9.0"
+            container_id: ubuntu_24_04
+            container_image: "ubuntu:24.04"
             container_libc: "gnu"
             docker_platform: "linux/amd64"
             shell: bash
@@ -166,8 +166,8 @@ jobs:
           - platform: linux/amd64+libc.glibc
             platform_slug: linux_amd64_libc.glibc
             runner: ubuntu-latest
-            container_id: mcr_microsoft_com_dotnet_runtime-deps_9_0-noble
-            container_image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble"
+            container_id: fedora_40
+            container_image: "fedora:40"
             container_libc: "gnu"
             docker_platform: "linux/amd64"
             shell: bash
@@ -178,8 +178,8 @@ jobs:
           - platform: linux/arm64+libc.glibc
             platform_slug: linux_arm64_libc.glibc
             runner: ubuntu-24.04-arm
-            container_id: mcr_microsoft_com_dotnet_runtime-deps_9_0
-            container_image: "mcr.microsoft.com/dotnet/runtime-deps:9.0"
+            container_id: ubuntu_24_04
+            container_image: "ubuntu:24.04"
             container_libc: "gnu"
             docker_platform: "linux/arm64"
             shell: bash
@@ -190,8 +190,8 @@ jobs:
           - platform: linux/arm64+libc.glibc
             platform_slug: linux_arm64_libc.glibc
             runner: ubuntu-24.04-arm
-            container_id: mcr_microsoft_com_dotnet_runtime-deps_9_0-noble
-            container_image: "mcr.microsoft.com/dotnet/runtime-deps:9.0-noble"
+            container_id: fedora_40
+            container_image: "fedora:40"
             container_libc: "gnu"
             docker_platform: "linux/arm64"
             shell: bash
