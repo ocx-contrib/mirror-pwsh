@@ -116,7 +116,14 @@ catalog:
   logo: logo.svg
 
 versions:
-  min: "7.6.0"
+  # 7.6.2, not 7.6.0 — upstream shipped `pwsh` mode 644 in 7.6.0 and 7.6.1 and
+  # switched to 755 at 7.6.2. ocx-mirror only learned to normalise the exec bit
+  # on declared `binaries` in 0.5.2 (ocx-sh/ocx-mirror#51), so the darwin
+  # artifacts already published for those two versions are non-executable and
+  # no command can repair them in place — `patch --metadata-only` re-references
+  # every layer by digest, and there is no `--republish` yet (#6). Dropping
+  # them out of range is the repair.
+  min: "7.6.2"
   new_per_run: 5
   poll_interval: "0 */6 * * *"
 
