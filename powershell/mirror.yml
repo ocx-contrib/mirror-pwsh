@@ -125,7 +125,7 @@ versions:
   # them out of range is the repair.
   min: "7.6.2"
   new_per_run: 5
-  poll_interval: "0 */6 * * *"
+  poll_interval: "4 4-23/6 * * *"
 
 tests:
   # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
